@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Meta Ad Auditor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f2f4f3; --surface: #ffffff; --ink: #16201c; --muted: #5e6a64; --line: #dce1de; --line2: #c9d0cc;
+    --accent: #0e6b57; --accent-ink: #ffffff; --link: #1f5fbf;
+    --red: #b3261e; --red-bg: #fbe9e7; --amber: #8a5300; --amber-bg: #fff3dc;
+    --green: #1d6b3f; --green-bg: #e6f4ea; --blue: #2f4ba0; --blue-bg: #eaeffd;
+    --grey: #4f5753; --grey-bg: #eceeed; --purple: #6a2c91; --purple-bg: #f3e9fa;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #121715; --surface: #1b211e; --ink: #e8ecea; --muted: #9aa5a0; --line: #2c3430; --line2: #3a443f;
+      --accent: #4cc3a5; --accent-ink: #0d1412; --link: #8ab4ff;
+      --red: #ffa79f; --red-bg: #3b1f1c; --amber: #f6c76e; --amber-bg: #392d14;
+      --green: #86d9a6; --green-bg: #173123; --blue: #aebdff; --blue-bg: #1f2744;
+      --grey: #c3c9c6; --grey-bg: #262d2a; --purple: #d7a8f5; --purple-bg: #2f2039;
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Public Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--ink); padding: 2.5rem 1rem 4rem; line-height: 1.45; }
+  .container { max-width: 1200px; margin: 0 auto; }
+  header { max-width: 68ch; margin-bottom: 1.75rem; }
+  h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.01em; margin-bottom: .5rem; }
+  .lede { font-size: 15px; color: var(--muted); }
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 1.25rem; margin-bottom: 1.5rem; }
+  .grid { display: grid; grid-template-columns: 2fr 1.2fr 110px; gap: 14px; }
+  @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
+  label { font-size: 13px; font-weight: 500; display: block; margin-bottom: 6px; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 5px; }
+  input, textarea { width: 100%; border: 1px solid var(--line2); background: var(--surface); color: var(--ink); border-radius: 6px; padding: 10px 12px; font: inherit; font-size: 14px; }
+  textarea { min-height: 76px; resize: vertical; }
+  .phrases { margin-top: 14px; }
+  details { margin-top: 14px; font-size: 13px; }
+  summary { cursor: pointer; color: var(--link); }
+  details ol { margin: 8px 0 0 20px; color: var(--muted); }
+  details li { margin-bottom: 4px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+  button { font-family: inherit; cursor: pointer; }
+  button:focus-visible, input:focus-visible, textarea:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+  .primary { background: var(--accent); color: var(--accent-ink); border: none; border-radius: 6px; padding: 11px 20px; font-size: 14px; font-weight: 600; }
+  .primary:disabled { opacity: .55; cursor: not-allowed; }
+  .secondary { background: var(--surface); color: var(--ink); border: 1px solid var(--line2); border-radius: 6px; padding: 10px 16px; font-size: 14px; }
+  .status { font-size: 13px; color: var(--muted); margin-top: 12px; min-height: 1em; }
+  .error { font-size: 13px; color: var(--red); background: var(--red-bg); border-radius: 6px; padding: 10px 14px; margin-top: 12px; display: none; }
+  .banner { font-size: 13px; background: var(--purple-bg); color: var(--purple); border-radius: 6px; padding: 9px 14px; margin-bottom: 12px; }
+
+  /* Triage strip: each count is also the filter for the table */
+  .triage { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
+  @media (max-width: 900px) { .triage { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  @media (max-width: 520px) { .triage { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .triage button { text-align: left; background: var(--surface); color: var(--muted); border: 1px solid var(--line); border-left: 4px solid var(--sev, var(--line2)); border-radius: 6px; padding: 10px 12px; font-size: 13px; }
+  .triage button b { display: block; color: var(--ink); font-size: 26px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .triage button[aria-pressed="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); border-left-color: var(--sev, var(--ink)); }
+  .triage button[aria-pressed="true"] b { color: var(--surface); }
+  .sev-fix { --sev: var(--red); } .sev-copy { --sev: var(--purple); } .sev-review { --sev: var(--amber); } .sev-tag { --sev: var(--grey); } .sev-ok { --sev: var(--green); }
+
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin-bottom: 10px; }
+  .toolbar .secondary { padding: 7px 12px; font-size: 13px; }
+  .table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 1100px; }
+  th { text-align: left; font-weight: 600; color: var(--muted); padding: 10px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  td { padding: 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .thumb { width: 60px; height: 60px; border-radius: 4px; object-fit: cover; background: var(--grey-bg); display: block; }
+  .adname { font-weight: 600; margin-bottom: 3px; }
+  .sub { color: var(--muted); font-size: 12px; }
+  .url { color: var(--link); word-break: break-all; font-size: 12px; }
+  .url-row { display: flex; flex-direction: column; gap: 3px; margin-bottom: 8px; }
+  .url-row:last-child { margin-bottom: 0; }
+  .pill { display: inline-block; font-size: 11px; font-weight: 500; border-radius: 20px; padding: 2px 9px; white-space: nowrap; width: fit-content; }
+  .k-pdp { background: var(--green-bg); color: var(--green); }
+  .k-collection { background: var(--blue-bg); color: var(--blue); }
+  .k-home, .k-other { background: var(--grey-bg); color: var(--grey); }
+  .i-fix { background: var(--red-bg); color: var(--red); }
+  .i-copy { background: var(--purple-bg); color: var(--purple); }
+  .i-review { background: var(--amber-bg); color: var(--amber); }
+  .i-tag { background: var(--grey-bg); color: var(--grey); }
+  .i-ok { background: var(--green-bg); color: var(--green); }
+  .issues { display: flex; flex-direction: column; gap: 4px; }
+  .copytext { max-width: 34ch; font-size: 12px; color: var(--muted); }
+  mark { background: var(--purple-bg); color: var(--purple); border-radius: 3px; padding: 0 2px; font-weight: 600; }
+  .tagger { display: inline-flex; }
+  .tagger button { background: var(--surface); color: var(--ink); border: 1px solid var(--line2); padding: 4px 10px; font-size: 12px; }
+  .tagger button:first-child { border-radius: 5px 0 0 5px; }
+  .tagger button:last-child { border-radius: 0 5px 5px 0; border-left: none; }
+  .tagger button[aria-pressed="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+  .auto { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .note { font-size: 12px; color: var(--muted); margin-top: 12px; max-width: 90ch; }
+  .empty { padding: 24px; color: var(--muted); font-size: 13px; }
+  .hidden { display: none; }
+  footer { margin-top: 2.5rem; font-size: 12px; color: var(--muted); }
+  footer a { color: var(--link); }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Meta Ad Auditor</h1>
+    <p class="lede">Pulls every active ad in a Meta ad account and flags the ones that waste spend: single-product ads sending people to a collection page, ads still running old offers, and ads with missing or unexpected destinations.</p>
+  </header>
+
+  <section class="panel" aria-label="Settings">
+    <div class="grid">
+      <div>
+        <label for="token">Access token</label>
+        <input type="password" id="token" placeholder="Paste a token with ads_read permission" autocomplete="off" spellcheck="false">
+        <p class="hint">Used only for requests to Meta from this page. It is never saved or sent anywhere else.</p>
+      </div>
+      <div>
+        <label for="account">Ad account ID</label>
+        <input type="text" id="account" placeholder="act_1234567890" autocomplete="off" spellcheck="false">
+        <p class="hint">The number after <code>act=</code> in your Ads Manager URL.</p>
+      </div>
+      <div>
+        <label for="ver">API version</label>
+        <input type="text" id="ver" value="v23.0" spellcheck="false">
+      </div>
+    </div>
+
+    <div class="phrases">
+      <label for="phrases">Outdated phrases to flag (one per line)</label>
+      <textarea id="phrases" placeholder="Summer Sale&#10;Free shipping over $50&#10;Ends Sunday"></textarea>
+      <p class="hint">Any active ad whose text contains one of these is flagged. Not case-sensitive. You can edit this after running the audit.</p>
+    </div>
+
+    <details>
+      <summary>How to get an access token</summary>
+      <ol>
+        <li>Open the Graph API Explorer at developers.facebook.com/tools/explorer.</li>
+        <li>Pick a Meta app you have access to, then add the <code>ads_read</code> permission.</li>
+        <li>Click Generate Access Token, approve, and copy the token into the field above.</li>
+        <li>These tokens are short-lived, so generate a fresh one each time you run the audit.</li>
+      </ol>
+    </details>
+
+    <div class="actions">
+      <button class="primary" id="runBtn">Run audit</button>
+      <button class="secondary" id="demoBtn">Try with sample data</button>
+    </div>
+    <div class="error" id="error" role="alert"></div>
+    <div class="status" id="status" aria-live="polite"></div>
+  </section>
+
+  <section id="results" class="hidden" aria-label="Audit results">
+    <div class="banner hidden" id="demoBanner">Showing sample data for a fictional store. Run the audit with your own token to see a real account.</div>
+    <div class="triage" id="triage"></div>
+    <div class="toolbar">
+      <button class="secondary" id="csvBtn">Download CSV</button>
+      <button class="secondary" id="copyBtn">Copy all URLs</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th></th><th>Ad</th><th>Format</th><th>Products shown</th><th>Destination</th><th>Ad text</th><th>Issues</th><th class="num">Spend, last 7 days</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <p class="note">Carousels and catalogue ads are marked as showing several products automatically. The API can’t tell what a single image or video shows, so look at the thumbnail and tag it One or Several. Tags are saved in this browser by ad ID. Rules: one product sent to a collection page means switch to the product page; several products sent to a single product page means review. URL types are read from Shopify-style paths (/products/ and /collections/).</p>
+  </section>
+
+  <footer>Built by Carlos Torres. Runs entirely in your browser and talks only to Meta’s Graph API.</footer>
+</div>
+
+<script>
+// ---------- State ----------
+let ADS = [];
+let FILTER = 'all';
+let DEMO = false;
+
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+};
+
+const ISSUE_META = {
+  fix:    { label: 'Switch to product page' },
+  copy:   { label: 'Outdated copy' },
+  review: { label: 'Review' },
+  tag:    { label: 'Needs tagging' },
+  ok:     { label: 'No issues' }
+};
+const KIND_LABEL = { pdp: 'Product page', collection: 'Collection', home: 'Homepage', other: 'Other page' };
+
+// ---------- Events ----------
+document.getElementById('runBtn').addEventListener('click', runAudit);
+document.getElementById('demoBtn').addEventListener('click', runDemo);
+document.getElementById('csvBtn').addEventListener('click', downloadCsv);
+document.getElementById('copyBtn').addEventListener('click', copyAll);
+document.getElementById('phrases').addEventListener('input', () => { if (ADS.length) render(); });
+
+// ---------- Fetch from Meta ----------
+async function runAudit() {
+  const token = document.getElementById('token').value.trim();
+  let account = document.getElementById('account').value.trim();
+  const ver = document.getElementById('ver').value.trim() || 'v23.0';
+  const status = document.getElementById('status');
+  const btn = document.getElementById('runBtn');
+  hideError();
+  if (!token) { showError('Paste an access token first. Open “How to get an access token” if you need one.'); return; }
+  if (!account) { showError('Enter the ad account ID, for example act_1234567890.'); return; }
+  if (!account.startsWith('act_')) account = 'act_' + account;
+
+  btn.disabled = true; btn.textContent = 'Running…';
+  const fields = [
+    'id', 'name',
+    'adset{name,promoted_object}',
+    'campaign{name}',
+    'creative{id,object_type,thumbnail_url,image_url,link_url,body,title,product_set_id,asset_feed_spec,object_story_spec}',
+    'insights.date_preset(last_7d){spend}'
+  ].join(',');
+  let next = `https://graph.facebook.com/${encodeURIComponent(ver)}/${encodeURIComponent(account)}/ads?fields=${encodeURIComponent(fields)}`
+    + `&effective_status=${encodeURIComponent('["ACTIVE"]')}&thumbnail_width=200&thumbnail_height=200&limit=100&access_token=${encodeURIComponent(token)}`;
+
+  const raw = [];
+  try {
+    let page = 0;
+    while (next) {
+      page++;
+      status.textContent = `Fetching page ${page} (${raw.length} ads so far)…`;
+      const res = await fetch(next);
+      const data = await res.json();
+      if (data.error) throw new Error(data.error.message);
+      raw.push(...(data.data || []));
+      next = data.paging && data.paging.next ? data.paging.next : null;
+    }
+    DEMO = false;
+    ADS = raw.map(parseAd);
+    status.textContent = `${ADS.length} active ads pulled from ${account}.`;
+    showResults();
+  } catch (err) {
+    showError('Meta returned an error: ' + err.message + ' Check that the token hasn’t expired and has ads_read access to this account.');
+    status.textContent = '';
+  }
+  btn.disabled = false; btn.textContent = 'Run audit';
+}
+
+function runDemo() {
+  hideError();
+  DEMO = true;
+  const phrases = document.getElementById('phrases');
+  if (!phrases.value.trim()) phrases.value = 'Summer Sale\nFree shipping over $50';
+  ADS = SAMPLE_ADS.map(parseAd);
+  document.getElementById('status').textContent = `${ADS.length} sample ads loaded.`;
+  showResults();
+}
+
+function showResults() {
+  FILTER = 'all';
+  document.getElementById('demoBanner').classList.toggle('hidden', !DEMO);
+  document.getElementById('results').classList.remove('hidden');
+  render();
+}
+function showError(msg) { const e = document.getElementById('error'); e.textContent = msg; e.style.display = 'block'; }
+function hideError() { document.getElementById('error').style.display = 'none'; }
+
+// ---------- Parsing ----------
+function parseAd(ad) {
+  const c = ad.creative || {};
+  const oss = c.object_story_spec || {};
+  const afs = c.asset_feed_spec || null;
+  const ld = oss.link_data || null;
+  const vd = oss.video_data || null;
+  let urls = [];
+  let type = 'Unknown';
+  let auto = null; // 'multi' when the format itself proves several products
+
+  const isCatalog = !!(c.product_set_id || oss.template_data || (ad.adset && ad.adset.promoted_object && ad.adset.promoted_object.product_set_id));
+  const cards = ld && Array.isArray(ld.child_attachments) ? ld.child_attachments : [];
+  const afsFormats = afs && afs.ad_formats ? afs.ad_formats : [];
+  const afsAssets = afs ? ((afs.images || []).length + (afs.videos || []).length) : 0;
+
+  if (isCatalog) { type = 'Catalogue / DPA'; auto = 'multi'; }
+  else if (cards.length > 1) { type = `Carousel (${cards.length} cards)`; auto = 'multi'; }
+  else if (afsFormats.includes('CAROUSEL')) { type = 'Carousel (flexible)'; auto = 'multi'; }
+  else if (afs && afsAssets > 1) { type = `Flexible (${afsAssets} assets)`; }
+  else if (vd || (afs && (afs.videos || []).length)) { type = 'Video'; }
+  else if (ld || (afs && (afs.images || []).length)) { type = 'Image'; }
+  else if (c.object_type) { type = c.object_type.toLowerCase().replace(/_/g, ' '); }
+
+  // Destination URLs: flexible variations, carousel cards, then single-link fallbacks
+  if (afs && afs.link_urls) urls = afs.link_urls.map(u => u.website_url).filter(Boolean);
+  cards.forEach(card => { if (card.link) urls.push(card.link); });
+  if (!urls.length && c.link_url) urls = [c.link_url];
+  if (!urls.length && ld && ld.link) urls = [ld.link];
+  if (!urls.length && oss.template_data && oss.template_data.link) urls = [oss.template_data.link];
+  if (!urls.length && vd && vd.call_to_action && vd.call_to_action.value && vd.call_to_action.value.link) urls = [vd.call_to_action.value.link];
+  if (!urls.length && ld && ld.call_to_action && ld.call_to_action.value && ld.call_to_action.value.link) urls = [ld.call_to_action.value.link];
+  urls = [...new Set(urls)];
+
+  const spend = ad.insights && ad.insights.data && ad.insights.data[0] ? Number(ad.insights.data[0].spend) : 0;
+
+  return {
+    id: String(ad.id),
+    name: ad.name || '(unnamed ad)',
+    campaign: ad.campaign ? ad.campaign.name : '—',
+    adset: ad.adset ? ad.adset.name : '—',
+    thumb: c.thumbnail_url || c.image_url || '',
+    type, auto, spend,
+    isCarousel: cards.length > 1 || afsFormats.includes('CAROUSEL'),
+    copy: collectCopy(c),
+    demoTag: ad._demoTag || null,
+    urls: urls.map(u => ({ url: u, kind: classifyUrl(u) }))
+  };
+}
+
+function collectCopy(c) {
+  const oss = c.object_story_spec || {};
+  const afs = c.asset_feed_spec || {};
+  const ld = oss.link_data || {}, vd = oss.video_data || {}, td = oss.template_data || {};
+  const out = [];
+  const push = v => { if (typeof v === 'string' && v.trim()) out.push(v.trim()); };
+  [c.body, c.title, ld.message, ld.name, ld.description, vd.message, vd.title, vd.link_description, td.message, td.name, td.description].forEach(push);
+  (ld.child_attachments || []).forEach(a => { push(a.name); push(a.description); });
+  ['bodies', 'titles', 'descriptions'].forEach(k => (afs[k] || []).forEach(x => push(x && x.text)));
+  return [...new Set(out)];
+}
+
+function classifyUrl(u) {
+  try {
+    const p = new URL(u).pathname.toLowerCase();
+    if (/\/products?\//.test(p)) return 'pdp';
+    if (/\/collections?\//.test(p)) return 'collection';
+    if (p === '/' || p === '' || /^\/[a-z]{2}(-[a-z]{2})?\/?$/.test(p)) return 'home';
+    return 'other';
+  } catch (e) { return 'other'; }
+}
+
+// ---------- Rules ----------
+function getPhrases() {
+  return document.getElementById('phrases').value.split('\n').map(s => s.trim()).filter(Boolean);
+}
+function copyHits(ad, phrases) {
+  const text = ad.copy.join('\n').toLowerCase();
+  return phrases.filter(p => text.includes(p.toLowerCase()));
+}
+function productTag(ad) {
+  if (ad.auto) return ad.auto;
+  return store.get('tag:' + ad.id) || (DEMO ? ad.demoTag : null);
+}
+function issuesFor(ad, phrases) {
+  const out = [];
+  const tag = productTag(ad);
+  const kinds = ad.urls.map(u => u.kind);
+  const hits = copyHits(ad, phrases);
+  if (hits.length) out.push({ key: 'copy', text: 'Outdated copy: ' + hits.join(', ') });
+  if (!ad.urls.length) {
+    out.push({ key: 'review', text: 'No destination URL found' });
+  } else {
+    if (!tag) out.push({ key: 'tag', text: 'Tag what the creative shows' });
+    else if (tag === 'single' && kinds.includes('collection')) out.push({ key: 'fix', text: 'One product, sent to a collection' });
+    else if (tag === 'multi' && !ad.isCarousel && kinds.includes('pdp') && !kinds.includes('collection')) out.push({ key: 'review', text: 'Several products, sent to one product page' });
+    if (kinds.some(k => k === 'home' || k === 'other')) out.push({ key: 'review', text: 'Check destination' });
+  }
+  if (!out.length) out.push({ key: 'ok', text: 'No issues' });
+  return { list: out, hits };
+}
+
+// ---------- Rendering ----------
+function render() {
+  const phrases = getPhrases();
+  const rows = ADS.map(a => ({ a, iss: issuesFor(a, phrases) })).sort((x, y) => y.a.spend - x.a.spend);
+  const counts = { all: rows.length, fix: 0, copy: 0, review: 0, tag: 0, ok: 0 };
+  rows.forEach(({ iss }) => new Set(iss.list.map(i => i.key)).forEach(k => counts[k]++));
+
+  const triage = document.getElementById('triage');
+  const order = [['all', 'Active ads'], ['fix', ISSUE_META.fix.label], ['copy', ISSUE_META.copy.label], ['review', ISSUE_META.review.label], ['tag', ISSUE_META.tag.label], ['ok', ISSUE_META.ok.label]];
+  triage.innerHTML = order.map(([k, label]) =>
+    `<button class="sev-${k}" data-f="${k}" aria-pressed="${FILTER === k}"><b>${counts[k]}</b>${label}</button>`).join('');
+  triage.querySelectorAll('button').forEach(b => b.addEventListener('click', () => { FILTER = b.dataset.f; render(); }));
+
+  const tbody = document.getElementById('rows');
+  const visible = rows.filter(({ iss }) => FILTER === 'all' || iss.list.some(i => i.key === FILTER));
+  if (!visible.length) {
+    tbody.innerHTML = `<tr><td colspan="8" class="empty">No ads in this group.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = '';
+  visible.forEach(({ a, iss }) => {
+    const tag = productTag(a);
+    const tr = document.createElement('tr');
+    const urlsHtml = a.urls.length
+      ? a.urls.map(u => `<div class="url-row"><span class="pill k-${u.kind}">${KIND_LABEL[u.kind]}</span><a class="url" href="${esc(safeHref(u.url))}" target="_blank" rel="noopener noreferrer">${esc(u.url)}</a></div>`).join('')
+      : '<span class="sub">None found</span>';
+    const userTag = store.get('tag:' + a.id);
+    const tagger = a.auto
+      ? `<span class="pill i-tag">Several</span><div class="auto">Automatic: ${esc(a.type)}</div>`
+      : `<div class="tagger" role="group" aria-label="Products shown in ${esc(a.name)}">
+           <button data-id="${esc(a.id)}" data-t="single" aria-pressed="${tag === 'single'}">One</button><button data-id="${esc(a.id)}" data-t="multi" aria-pressed="${tag === 'multi'}">Several</button>
+         </div>${!userTag && DEMO && a.demoTag ? '<div class="auto">Sample tag</div>' : ''}`;
+    const copyHtml = a.copy.length ? `<div class="copytext">${highlight(a.copy[0], iss.hits)}${a.copy.length > 1 ? `<div class="auto">+${a.copy.length - 1} more text variations</div>` : ''}</div>` : '<span class="sub">—</span>';
+    tr.innerHTML = `
+      <td>${a.thumb ? `<img class="thumb" src="${esc(a.thumb)}" alt="" loading="lazy">` : '<div class="thumb"></div>'}</td>
+      <td><div class="adname">${esc(a.name)}</div><div class="sub">${esc(a.campaign)}<br>${esc(a.adset)}<br>ID ${esc(a.id)}</div></td>
+      <td>${esc(a.type)}</td>
+      <td>${tagger}</td>
+      <td>${urlsHtml}</td>
+      <td>${copyHtml}</td>
+      <td><div class="issues">${iss.list.map(i => `<span class="pill i-${i.key}">${esc(i.text)}</span>`).join('')}</div></td>
+      <td class="num">${a.spend ? a.spend.toFixed(2) : '—'}</td>`;
+    tbody.appendChild(tr);
+  });
+  tbody.querySelectorAll('.tagger button').forEach(b => b.addEventListener('click', () => {
+    store.set('tag:' + b.dataset.id, b.dataset.t);
+    render();
+  }));
+}
+
+function highlight(text, hits) {
+  let out = esc(text.length > 180 ? text.slice(0, 180) + '…' : text);
+  hits.forEach(h => {
+    const re = new RegExp(esc(h).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+    out = out.replace(re, m => `<mark>${m}</mark>`);
+  });
+  return out;
+}
+
+// ---------- Export ----------
+function downloadCsv() {
+  const phrases = getPhrases();
+  const head = ['Campaign', 'Ad set', 'Ad', 'Ad ID', 'Format', 'Products shown', 'URL', 'URL type', 'Issues', 'Outdated phrases found', 'Spend last 7 days'];
+  const lines = [head];
+  ADS.forEach(a => {
+    const iss = issuesFor(a, phrases);
+    const t = productTag(a);
+    const tag = t === 'single' ? 'One' : t === 'multi' ? 'Several' : 'Untagged';
+    (a.urls.length ? a.urls : [{ url: '', kind: 'other' }]).forEach(u =>
+      lines.push([a.campaign, a.adset, a.name, a.id, a.type, tag, u.url, u.url ? KIND_LABEL[u.kind] : '', iss.list.map(i => i.text).join('; '), iss.hits.join('; '), a.spend.toFixed(2)]));
+  });
+  const csv = lines.map(r => r.map(x => `"${String(x).replace(/"/g, '""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = DEMO ? 'ad-audit-sample.csv' : 'ad-audit.csv';
+  link.click();
+}
+
+function copyAll() {
+  const text = ADS.filter(a => a.urls.length).map(a =>
+    `${a.name} (${a.id})\n` + a.urls.map(u => `[${KIND_LABEL[u.kind]}] ${u.url}`).join('\n')).join('\n\n');
+  const b = document.getElementById('copyBtn');
+  navigator.clipboard.writeText(text).then(() => { b.textContent = 'Copied'; }, () => { b.textContent = 'Copy failed'; });
+  setTimeout(() => b.textContent = 'Copy all URLs', 1500);
+}
+
+function safeHref(u) { return /^https?:\/\//i.test(u) ? u : '#'; }
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+
+// ---------- Sample data (fictional store, no real accounts) ----------
+function swatch(color, letter) {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120"><rect width="120" height="120" fill="${color}"/><text x="60" y="76" font-family="Arial" font-size="48" font-weight="700" fill="#ffffff" text-anchor="middle">${letter}</text></svg>`;
+  return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+}
+const SHOP = 'https://fieldnote-supply.example';
+const spendOf = v => ({ data: [{ spend: String(v) }] });
+const SAMPLE_ADS = [
+  { id: '9000000000000001', name: 'Canvas Tote | Static 01', _demoTag: 'single',
+    campaign: { name: 'Prospecting | Bags' }, adset: { name: 'Broad | US' }, insights: spendOf(412.5),
+    creative: { thumbnail_url: swatch('#7a8f6a', 'T'), object_story_spec: { link_data: {
+      link: SHOP + '/collections/bags', message: 'Built to carry everything you need. Summer Sale: 20% off, ends Sunday.', name: 'The Canvas Tote' } } } },
+  { id: '9000000000000002', name: 'Weekender | UGC video 03', _demoTag: 'single',
+    campaign: { name: 'Prospecting | Bags' }, adset: { name: 'Broad | US' }, insights: spendOf(389.2),
+    creative: { thumbnail_url: swatch('#4b5d7a', 'W'), object_story_spec: { video_data: {
+      message: 'The bag that goes from desk to departure gate.', title: 'The Weekender',
+      call_to_action: { type: 'SHOP_NOW', value: { link: SHOP + '/products/weekender-bag' } } } } } },
+  { id: '9000000000000003', name: 'Leather Wallet | Flexible', _demoTag: 'single',
+    campaign: { name: 'Prospecting | Small goods' }, adset: { name: 'Interests | Gifts' }, insights: spendOf(276.9),
+    creative: { thumbnail_url: swatch('#8a5a3c', 'L'), asset_feed_spec: {
+      images: [{ hash: 'a' }, { hash: 'b' }, { hash: 'c' }],
+      link_urls: [{ website_url: SHOP + '/products/leather-wallet' }, { website_url: SHOP + '/collections/wallets' }],
+      bodies: [{ text: 'Slim, full-grain and made to last a decade.' }, { text: 'Free shipping over $50 on every order.' }],
+      titles: [{ text: 'The Everyday Wallet' }] } } },
+  { id: '9000000000000004', name: 'Bestsellers | Carousel',
+    campaign: { name: 'Prospecting | Range' }, adset: { name: 'Broad | US' }, insights: spendOf(198.4),
+    creative: { thumbnail_url: swatch('#2f6f62', 'C'), object_story_spec: { link_data: {
+      message: 'Three bags our customers buy again and again.',
+      child_attachments: [
+        { link: SHOP + '/products/canvas-tote', name: 'Canvas Tote' },
+        { link: SHOP + '/products/weekender-bag', name: 'Weekender' },
+        { link: SHOP + '/products/field-backpack', name: 'Field Backpack' }] } } } },
+  { id: '9000000000000005', name: 'Full catalogue | DPA',
+    campaign: { name: 'Retargeting | Catalogue' }, adset: { name: 'Viewed, not purchased | 14d', promoted_object: { product_set_id: '1' } }, insights: spendOf(164.0),
+    creative: { thumbnail_url: swatch('#5c4b7a', 'D'), product_set_id: '1', object_story_spec: { template_data: {
+      link: SHOP + '/collections/all', message: 'Still thinking it over? {{product.name}} is waiting for you.' } } } },
+  { id: '9000000000000006', name: 'Gift Set | Static 02', _demoTag: 'multi',
+    campaign: { name: 'Prospecting | Gifts' }, adset: { name: 'Interests | Gifts' }, insights: spendOf(121.7),
+    creative: { thumbnail_url: swatch('#a0603f', 'G'), object_story_spec: { link_data: {
+      link: SHOP + '/products/notebook', message: 'The gift set: notebook, pen and leather cover in one box.', name: 'Give the whole set' } } } },
+  { id: '9000000000000007', name: 'Brand story | Video 01',
+    campaign: { name: 'Prospecting | Brand' }, adset: { name: 'Broad | US' }, insights: spendOf(88.3),
+    creative: { thumbnail_url: swatch('#3d6b8a', 'B'), object_story_spec: { video_data: {
+      message: 'Small workshop, long-lasting goods.',
+      call_to_action: { type: 'LEARN_MORE', value: { link: SHOP + '/' } } } } } },
+  { id: '9000000000000008', name: 'Lead form | Newsletter',
+    campaign: { name: 'Leads | Newsletter' }, adset: { name: 'Broad | US' }, insights: spendOf(42.0),
+    creative: { thumbnail_url: swatch('#6b6b6b', 'N'), object_story_spec: { video_data: {
+      message: 'Get 10% off your first order when you join the list.',
+      call_to_action: { type: 'SIGN_UP', value: { lead_gen_form_id: '1' } } } } } }
+];
+</script>
+</body>
+</html>
